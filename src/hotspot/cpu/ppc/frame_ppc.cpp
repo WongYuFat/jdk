@@ -52,6 +52,8 @@ void RegisterMap::check_location_valid() {
 #endif // ASSERT
 
 bool frame::safe_for_sender(JavaThread *thread) {
+  ResourceMark rm;
+
   bool safe = false;
   address sp = (address)_sp;
   address fp = (address)_fp;
@@ -107,9 +109,13 @@ bool frame::safe_for_sender(JavaThread *thread) {
       return false;
     }
 
-    abi_minframe* sender_abi = (abi_minframe*) fp;
-    intptr_t* sender_sp = (intptr_t*) fp;
-    address   sender_pc = (address) sender_abi->lr;;
+    intptr_t* sender_sp = NULL;
+    address   sender_pc = NULL;
+    if (!_cb->frame_parser()->sender_frame(
+          thread, _pc, (intptr_t*)sp, (intptr_t*)unextended_sp, (intptr_t*)fp, fp_safe,
+            &sender_pc, &sender_sp, NULL, NULL)) {
+      return false;
+    }
 
     // We must always be able to find a recognizable pc.
     CodeBlob* sender_blob = CodeCache::find_blob_unsafe(sender_pc);

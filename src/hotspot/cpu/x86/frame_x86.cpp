@@ -54,6 +54,8 @@ void RegisterMap::check_location_valid() {
 // Profiling/safepoint support
 
 bool frame::safe_for_sender(JavaThread *thread) {
+  ResourceMark rm;
+
   address   sp = (address)_sp;
   address   fp = (address)_fp;
   address   unextended_sp = (address)_unextended_sp;
@@ -110,42 +112,11 @@ bool frame::safe_for_sender(JavaThread *thread) {
     intptr_t* sender_unextended_sp = NULL;
     address   sender_pc = NULL;
     intptr_t* saved_fp =  NULL;
-
-    if (is_interpreted_frame()) {
-      // fp must be safe
-      if (!fp_safe) {
-        return false;
-      }
-
-      sender_pc = (address) this->fp()[return_addr_offset];
-      // for interpreted frames, the value below is the sender "raw" sp,
-      // which can be different from the sender unextended sp (the sp seen
-      // by the sender) because of current frame local variables
-      sender_sp = (intptr_t*) addr_at(sender_sp_offset);
-      sender_unextended_sp = (intptr_t*) this->fp()[interpreter_frame_sender_sp_offset];
-      saved_fp = (intptr_t*) this->fp()[link_offset];
-
-    } else {
-      // must be some sort of compiled/runtime frame
-      // fp does not have to be safe (although it could be check for c1?)
-
-      // check for a valid frame_size, otherwise we are unlikely to get a valid sender_pc
-      if (_cb->frame_size() <= 0) {
-        return false;
-      }
-
-      sender_sp = _unextended_sp + _cb->frame_size();
-      // Is sender_sp safe?
-      if (!thread->is_in_full_stack_checked((address)sender_sp)) {
-        return false;
-      }
-      sender_unextended_sp = sender_sp;
-      // On Intel the return_address is always the word on the stack
-      sender_pc = (address) *(sender_sp-1);
-      // Note: frame::sender_sp_offset is only valid for compiled frame
-      saved_fp = (intptr_t*) *(sender_sp - frame::sender_sp_offset);
+    if (!_cb->frame_parser()->sender_frame(
+          thread, _pc, (intptr_t*)sp, (intptr_t*)unextended_sp, (intptr_t*)fp, fp_safe,
+            &sender_pc, &sender_sp, &sender_unextended_sp, &saved_fp)) {
+      return false;
     }
-
 
     // If the potential sender is the interpreter then we can do some more checking
     if (Interpreter::contains(sender_pc)) {

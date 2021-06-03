@@ -54,6 +54,8 @@ void RegisterMap::check_location_valid() {
 // Profiling/safepoint support
 
 bool frame::safe_for_sender(JavaThread *thread) {
+  ResourceMark rm;
+
   address   sp = (address)_sp;
   address   fp = (address)_fp;
   address   unextended_sp = (address)_unextended_sp;
@@ -98,28 +100,10 @@ bool frame::safe_for_sender(JavaThread *thread) {
 
     intptr_t* sender_sp = NULL;
     address   sender_pc = NULL;
-
-    if (is_interpreted_frame()) {
-      // fp must be safe
-      if (!fp_safe) {
-        return false;
-      }
-
-      sender_pc = (address) this->fp()[return_addr_offset];
-      sender_sp = (intptr_t*) addr_at(sender_sp_offset);
-
-    } else {
-      // must be some sort of compiled/runtime frame
-      // fp does not have to be safe (although it could be check for c1?)
-
-      sender_sp = _unextended_sp + _cb->frame_size();
-      // Is sender_sp safe?
-      if (!thread->is_in_full_stack_checked((address)sender_sp)) {
-        return false;
-      }
-      // With our calling conventions, the return_address should
-      // end up being the word on the stack
-      sender_pc = (address) *(sender_sp - sender_sp_offset + return_addr_offset);
+    if (!_cb->frame_parser()->sender_frame(
+          thread, _pc, (intptr_t*)sp, (intptr_t*)unextended_sp, (intptr_t*)fp, fp_safe,
+            &sender_pc, &sender_sp, NULL, NULL)) {
+      return false;
     }
 
     // We must always be able to find a recognizable pc
