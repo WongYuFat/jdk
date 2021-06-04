@@ -140,7 +140,7 @@ void ICStub::print() {
 
 void InlineCacheBuffer::initialize() {
   if (_buffer != NULL) return; // already initialized
-  int code_size = align_up(10*K, 2*BytesPerWord);
+  int code_size = (int)align_up(10*K, 2*BytesPerWord);
   BufferBlob* blob = BufferBlob::create("InlineCacheBuffer", code_size);
   if (blob == NULL) {
     vm_exit_out_of_memory(code_size, OOM_MALLOC_ERROR, "CodeCache: no room for InlineCacheBuffer");
